@@ -1,27 +1,36 @@
 import pandas as pd
 import numpy as np
 from database import get_session, PriceData
-from sqlalchemy import select
+from sqlalchemy import select, func, desc
 import ta
-
-
-# Vor dem ausführen des Codes: pip install ta
-
 
 class DataProcessor:
     def __init__(self):
         self.session = get_session()
 
-    def get_price_data(self, limit=None):
-        """Lade Preisdaten aus der Datenbank"""
-        query = select(PriceData).order_by(PriceData.timestamp)
-        if limit:
-            query = query.limit(limit)
+    def get_price_data_in_range(self, start_timestamp, end_timestamp , limit=None):
+        if start_timestamp != None and end_timestamp != None:
+            query = select(PriceData).where(PriceData.timestamp.between(start_timestamp, end_timestamp))
+            if limit:
+                query = query.limit(limit)
+            return self._get_price_data(query)
+        return None
             
-        result = self.session.execute(query)
-        records = result.scalars().all()
-        
-        # Konvertiere zu DataFrame
+    def get_price_data_random(self, limit=1000):
+            r_query = select(PriceData).order_by(func.random()).limit(1)
+            random_entrie = self.session.execute(r_query).scalars().all()
+            df = self.convert_query_records_to_dataframe(random_entrie)
+
+            start_timestamp = '2012-01-01 10:01:00.000000'
+            end_timestamp = df.iloc[-1]['timestamp']
+            print("Suche: Startzeitpunkt", start_timestamp)
+            print("Suche: Endzeitpunkt", end_timestamp)
+
+            query = select(PriceData).where(PriceData.timestamp.between(start_timestamp, end_timestamp))
+            query = query.limit(limit)
+            return self._get_price_data(query)
+    
+    def convert_query_records_to_dataframe(self, records):
         df = pd.DataFrame([{
             'timestamp': r.timestamp,
             'open': r.open,
@@ -30,8 +39,26 @@ class DataProcessor:
             'close': r.close,
             'volume': r.volume
         } for r in records])
-        
         return df
+
+    def get_price_data_from_limit(self, limit=60):
+        query = select(PriceData).order_by(desc(PriceData.timestamp))
+        if limit:
+            query = query.limit(limit)
+
+        records = self.session.execute(query).scalars().all()
+        df = self.convert_query_records_to_dataframe(records)
+        # timstamp order invertiert
+        start_timestamp = df.iloc[-1]['timestamp']
+        end_timestamp = df.iloc[0]['timestamp']
+        print("Suche: Startzeitpunkt", start_timestamp)
+        print("Suche: Endzeitpunkt", end_timestamp)
+        return df
+
+    def _get_price_data(self, query):
+        """Lade Preisdaten aus der Datenbank"""             
+        records = self.session.execute(query).scalars().all()         
+        return self.convert_query_records_to_dataframe(records)
 
     def calculate_indicators(self, df):
         """Berechne technische Indikatoren"""
@@ -118,26 +145,52 @@ class DataProcessor:
             'timestamp': df.iloc[-1]['timestamp']
         }
 
+def test_range_from_to():   
+    start_timestamp = '2016-01-31 00:00:00'
+    end_timestamp = '2016-01-31 23:59:59'
+    print("Test von-bis, letzter gefundener Datensatz wird ausgewertet")
+    print("Suche: Startzeitpunkt", start_timestamp)
+    print("Suche: Endzeitpunkt", end_timestamp)
+    print("Suche im Zeitraum nach dem letzten Eintrag in der Datenbank...")
+    return processor.get_price_data_in_range(start_timestamp, end_timestamp)
+
+def test_range_from_to_with_limit(limit):   
+    start_timestamp = '2016-01-31 00:00:00'
+    end_timestamp = '2016-01-31 23:59:59'
+    print("Test von-bis, letzter gefundener Datensatz wird ausgewertet")
+    print("Suche: Startzeitpunkt", start_timestamp)
+    print("Suche: Endzeitpunkt", end_timestamp)
+    print("Suche im Zeitraum nach dem letzten Eintrag in der Datenbank...")
+    return processor.get_price_data_in_range(start_timestamp, end_timestamp, limit)
+
+def test_random(limit=1000):
+    print("\nEs wird vom frühstmöglichen Eintrag in der Datenbank,\nzu einem zufälligen Eintrag, der letzte Zeitpunkt ausgewertet")
+    return processor.get_price_data_random(limit)
+
+def test_from_limit(limit=None):
+    print(f"\nVom letzten vorhandenen Datensatz werden, {limit} Einträge vorher bewertet")
+    return processor.get_price_data_from_limit(limit)
+
 if __name__ == "__main__":
-    # Test der Implementierung
     processor = DataProcessor()
-    
-    # Lade die letzten 1000 Datenpunkte
-    print("Lade Daten aus der Datenbank...")
-    df = processor.get_price_data(limit=1000)
-    
+
+    #df = test_range_from_to()
+    #df = test_range_from_to_with_limit(100)
+    #df = test_random(10000)
+    df = test_from_limit(60)
+
     if not df.empty:
-        print(f"Daten geladen. Anzahl der Datenpunkte: {len(df)}")
+        print(f"Anzahl geladener Datenpunkte: {len(df)}")
         
         # Berechne Indikatoren
-        print("Berechne technische Indikatoren...")
+        print("Berechne technische Indikatoren anhand der Datenpunkte...")
         df_with_indicators = processor.calculate_indicators(df)
         
         # Generiere Trading-Signal
-        print("\nGeneriere Trading-Signal...")
+        print("\nGeneriere Trading-Signal zum letzten Zeitpunkt...")
         signal_data = processor.generate_signals(df_with_indicators)
         
-        print("\nAktuelles Trading-Signal:")
+        print("\nTrading-Signal:")
         print(f"Zeitpunkt: {signal_data['timestamp']}")
         print(f"Signal: {signal_data['signal'].upper()}")
         print("\nMarktbedingungen:")

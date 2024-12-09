@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 class DataCollector:
     def __init__(self):
         load_dotenv()
+        # https://docs.ccxt.com/#/
         self.exchange = ccxt.binance({
             'apiKey': os.getenv('BINANCE_API_KEY'),
             'secret': os.getenv('BINANCE_SECRET_KEY')

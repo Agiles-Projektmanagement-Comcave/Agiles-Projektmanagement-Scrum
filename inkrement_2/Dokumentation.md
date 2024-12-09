@@ -1,5 +1,6 @@
 # Sprint 2
 ## Installation
+Neue python Bibliothek: ta
 
 Vorausetzungen os: Python 3.10.6, git
 
@@ -23,12 +24,12 @@ Vorausetzungen os: Python 3.10.6, git
 1. Basis-Algorithmus entwickeln
    + Muster definieren
    + Erkennungslogik implementieren
-   - ~Test-Framework aufsetzen~
+   + Test-Framework aufsetzen
    + manuelle Tests (data_processor.py)
 
 2. Erste Optimierungen
    + Performance-Verbesserungen
-   + Fehlertoleranz erhöhen
+   - Fehlertoleranz erhöhen
 
 ### Dailies
 - Täglich 15 Minuten
